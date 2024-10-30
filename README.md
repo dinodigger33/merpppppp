@@ -1,117 +1,119 @@
-# merpppppp
-cool
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Game with Save Feature</title>
+    <title>Basic Minecraft-like Game</title>
     <style>
         body { margin: 0; overflow: hidden; }
-        #controls { position: fixed; top: 10px; left: 10px; z-index: 10; }
-        button { margin: 5px; padding: 10px; font-size: 16px; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
-    <div id="controls">
-        <button onclick="saveGame()">Save Game</button>
-        <button onclick="loadGame()">Load Game</button>
-    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        // Set up Three.js scene, camera, and renderer
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+        // Basic setup
+        let scene, camera, renderer;
+        const blockSize = 1;
+        const worldSize = 10;
+        let blocks = {};
 
-        // Create player cube
-        const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-        const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-        const playerCube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-        playerCube.position.y = 0.5; // Set above ground level
-        scene.add(playerCube);
+        function init() {
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb);
 
-        // Ground
-        const planeGeometry = new THREE.PlaneGeometry(50, 50);
-        const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-        const ground = new THREE.Mesh(planeGeometry, planeMaterial);
-        ground.rotation.x = -Math.PI / 2; // Lay the plane flat
-        scene.add(ground);
+            // Set up camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(worldSize / 2, worldSize / 2, worldSize * 1.5);
+            camera.lookAt(worldSize / 2, 0, worldSize / 2);
 
-        // Lighting
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(5, 10, 5);
-        scene.add(light);
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
 
-        // Position camera
-        camera.position.set(0, 5, 10);
-        camera.lookAt(0, 0, 0);
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(5, 10, 5).normalize();
+            scene.add(directionalLight);
 
-        // Player controls
-        const keys = {};
-        document.addEventListener("keydown", (event) => { keys[event.key] = true; });
-        document.addEventListener("keyup", (event) => { keys[event.key] = false; });
+            // Controls for adding and removing blocks
+            window.addEventListener("click", onBlockClick);
 
-        // Move player cube based on key input
-        function movePlayer() {
-            const speed = 0.1;
-            if (keys["ArrowUp"] || keys["w"]) playerCube.position.z -= speed;
-            if (keys["ArrowDown"] || keys["s"]) playerCube.position.z += speed;
-            if (keys["ArrowLeft"] || keys["a"]) playerCube.position.x -= speed;
-            if (keys["ArrowRight"] || keys["d"]) playerCube.position.x += speed;
+            // Create the ground
+            createGround();
+            animate();
         }
 
-        // Game loop
+        // Create ground layer of blocks
+        function createGround() {
+            for (let x = 0; x < worldSize; x++) {
+                for (let z = 0; z < worldSize; z++) {
+                    addBlock(x, 0, z, 0x8B4513); // Brown ground blocks
+                }
+            }
+        }
+
+        // Add a block to the scene and store its position in `blocks`
+        function addBlock(x, y, z, color = 0x00ff00) {
+            const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+            const material = new THREE.MeshStandardMaterial({ color: color });
+            const block = new THREE.Mesh(geometry, material);
+            block.position.set(x, y, z);
+            scene.add(block);
+
+            blocks[`${x},${y},${z}`] = block; // Store block by position
+        }
+
+        // Remove a block at a specific position
+        function removeBlock(x, y, z) {
+            const key = `${x},${y},${z}`;
+            if (blocks[key]) {
+                scene.remove(blocks[key]);
+                delete blocks[key];
+            }
+        }
+
+        // Handles adding/removing blocks on click
+        function onBlockClick(event) {
+            event.preventDefault();
+
+            // Raycaster for detecting where we click in the 3D world
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2(
+                (event.clientX / window.innerWidth) * 2 - 1,
+                -(event.clientY / window.innerHeight) * 2 + 1
+            );
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(Object.values(blocks));
+            if (intersects.length > 0) {
+                // Get the position of the intersected block
+                const intersectedBlock = intersects[0].object;
+                const pos = intersectedBlock.position;
+
+                // Remove block if shift key is held, otherwise add one
+                if (event.shiftKey) {
+                    removeBlock(pos.x, pos.y, pos.z);
+                } else {
+                    // Place a new block on top
+                    addBlock(pos.x, pos.y + blockSize, pos.z);
+                }
+            }
+        }
+
+        // Render loop
         function animate() {
             requestAnimationFrame(animate);
-            movePlayer();
             renderer.render(scene, camera);
         }
-        animate();
 
-        // Saving game state
-        async function saveGame() {
-            const gameState = {
-                position: {
-                    x: playerCube.position.x,
-                    y: playerCube.position.y,
-                    z: playerCube.position.z
-                }
-            };
-            const gameStateBlob = new Blob([JSON.stringify(gameState, null, 2)], { type: 'application/json' });
-
-            const handle = await window.showSaveFilePicker({
-                suggestedName: "game-save.json",
-                types: [{ description: "JSON File", accept: { "application/json": [".json"] } }]
-            });
-            const writable = await handle.createWritable();
-            await writable.write(gameStateBlob);
-            await writable.close();
-            alert("Game Saved!");
-        }
-
-        // Loading game state
-        async function loadGame() {
-            const [fileHandle] = await window.showOpenFilePicker({
-                types: [{ description: "JSON Files", accept: { "application/json": [".json"] } }]
-            });
-            const file = await fileHandle.getFile();
-            const contents = await file.text();
-            const gameState = JSON.parse(contents);
-
-            // Update player position
-            playerCube.position.set(gameState.position.x, gameState.position.y, gameState.position.z);
-            alert("Game Loaded!");
-        }
-
-        // Handle window resize
-        window.addEventListener("resize", () => {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-        });
+        // Start the game
+        init();
     </script>
 </body>
 </html>
+
