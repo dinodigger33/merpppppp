@@ -3,117 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Basic Minecraft-like Game</title>
+    <title>Infinite Runner</title>
     <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #87CEEB;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+        }
     </style>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <div id="score">Score: 0</div>
+    <canvas id="gameCanvas"></canvas>
     <script>
-        // Basic setup
-        let scene, camera, renderer;
-        const blockSize = 1;
-        const worldSize = 10;
-        let blocks = {};
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-        function init() {
-            // Create scene
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87ceeb);
+        let player = { x: 50, y: canvas.height - 80, width: 50, height: 50, dy: 0, gravity: 1.5, jumpPower: -25, grounded: false };
+        let obstacles = [];
+        let gameSpeed = 5;
+        let score = 0;
+        let gameRunning = true;
 
-            // Set up camera
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(worldSize / 2, worldSize / 2, worldSize * 1.5);
-            camera.lookAt(worldSize / 2, 0, worldSize / 2);
-
-            // Renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
-
-            // Add lights
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-            directionalLight.position.set(5, 10, 5).normalize();
-            scene.add(directionalLight);
-
-            // Controls for adding and removing blocks
-            window.addEventListener("click", onBlockClick);
-
-            // Create the ground
-            createGround();
-            animate();
+        function drawPlayer() {
+            ctx.fillStyle = "red";
+            ctx.fillRect(player.x, player.y, player.width, player.height);
         }
 
-        // Create ground layer of blocks
-        function createGround() {
-            for (let x = 0; x < worldSize; x++) {
-                for (let z = 0; z < worldSize; z++) {
-                    addBlock(x, 0, z, 0x8B4513); // Brown ground blocks
+        function drawObstacles() {
+            ctx.fillStyle = "black";
+            obstacles.forEach(obs => ctx.fillRect(obs.x, obs.y, obs.width, obs.height));
+        }
+
+        function updateObstacles() {
+            if (Math.random() < 0.015) {
+                let lastObstacle = obstacles[obstacles.length - 1];
+                let minSpacing = 150; // Minimum spacing between obstacles
+                if (!lastObstacle || lastObstacle.x < canvas.width - minSpacing) {
+                    obstacles.push({ x: canvas.width, y: canvas.height - 50, width: 40, height: 50 });
+                }
+            }
+            obstacles.forEach(obs => obs.x -= gameSpeed);
+            obstacles = obstacles.filter(obs => obs.x + obs.width > 0);
+        }
+
+        function checkCollision() {
+            for (let obs of obstacles) {
+                if (
+                    player.x < obs.x + obs.width &&
+                    player.x + player.width > obs.x &&
+                    player.y < obs.y + obs.height &&
+                    player.y + player.height > obs.y
+                ) {
+                    gameRunning = false;
+                    alert("Game Over! Score: " + score);
+                    document.location.reload();
                 }
             }
         }
 
-        // Add a block to the scene and store its position in `blocks`
-        function addBlock(x, y, z, color = 0x00ff00) {
-            const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
-            const material = new THREE.MeshStandardMaterial({ color: color });
-            const block = new THREE.Mesh(geometry, material);
-            block.position.set(x, y, z);
-            scene.add(block);
-
-            blocks[`${x},${y},${z}`] = block; // Store block by position
-        }
-
-        // Remove a block at a specific position
-        function removeBlock(x, y, z) {
-            const key = `${x},${y},${z}`;
-            if (blocks[key]) {
-                scene.remove(blocks[key]);
-                delete blocks[key];
+        function updatePlayer() {
+            player.y += player.dy;
+            player.dy += player.gravity;
+            if (player.y >= canvas.height - player.height) {
+                player.y = canvas.height - player.height;
+                player.dy = 0;
+                player.grounded = true;
+            } else {
+                player.grounded = false;
             }
         }
 
-        // Handles adding/removing blocks on click
-        function onBlockClick(event) {
-            event.preventDefault();
-
-            // Raycaster for detecting where we click in the 3D world
-            const raycaster = new THREE.Raycaster();
-            const mouse = new THREE.Vector2(
-                (event.clientX / window.innerWidth) * 2 - 1,
-                -(event.clientY / window.innerHeight) * 2 + 1
-            );
-            raycaster.setFromCamera(mouse, camera);
-
-            const intersects = raycaster.intersectObjects(Object.values(blocks));
-            if (intersects.length > 0) {
-                // Get the position of the intersected block
-                const intersectedBlock = intersects[0].object;
-                const pos = intersectedBlock.position;
-
-                // Remove block if shift key is held, otherwise add one
-                if (event.shiftKey) {
-                    removeBlock(pos.x, pos.y, pos.z);
-                } else {
-                    // Place a new block on top
-                    addBlock(pos.x, pos.y + blockSize, pos.z);
-                }
+        function jump() {
+            if (player.grounded) {
+                player.dy = player.jumpPower;
             }
         }
 
-        // Render loop
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
+        document.addEventListener("keydown", (e) => {
+            if (e.code === "Space") jump();
+        });
+
+        function updateScore() {
+            document.getElementById("score").innerText = "Score: " + score;
         }
 
-        // Start the game
-        init();
+        function gameLoop() {
+            if (!gameRunning) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPlayer();
+            drawObstacles();
+            updatePlayer();
+            updateObstacles();
+            checkCollision();
+            score++;
+            updateScore();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        gameLoop();
     </script>
 </body>
 </html>
-
