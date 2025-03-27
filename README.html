@@ -33,14 +33,14 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        let player = { x: 50, y: canvas.height - 80, width: 50, height: 50, dy: 0, gravity: 2.0, jumpPower: -25, grounded: false };
+        let player = { x: 50, y: canvas.height - 80, width: 50, height: 50, dy: 0, gravity: 2.0, jumpPower: -30, grounded: false };
         let obstacles = [];
         let gameSpeed = 5;
         let score = 0;
         let gameRunning = true;
 
         function drawPlayer() {
-            ctx.fillStyle = "red";
+            ctx.fillStyle = "blue";
             ctx.fillRect(player.x, player.y, player.width, player.height);
         }
 
