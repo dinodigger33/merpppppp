@@ -33,7 +33,7 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        let player = { x: 50, y: canvas.height - 80, width: 50, height: 50, dy: 0, gravity: 1.5, jumpPower: -25, grounded: false };
+        let player = { x: 50, y: canvas.height - 80, width: 50, height: 50, dy: 0, gravity: 1.5, jumpPower: -20, grounded: false };
         let obstacles = [];
         let gameSpeed = 5;
         let score = 0;
